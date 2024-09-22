@@ -19,6 +19,10 @@ io.on('connection', (socket) => {
         const partnerSocket = waitingUser;
         waitingUser = null;
 
+        // Set partner IDs for both users
+        socket.partnerId = partnerSocket.id;
+        partnerSocket.partnerId = socket.id;
+
         // Notify both users that they're connected
         socket.emit('connected', { partnerId: partnerSocket.id });
         partnerSocket.emit('connected', { partnerId: socket.id });
@@ -27,6 +31,7 @@ io.on('connection', (socket) => {
         waitingUser = socket;
     }
 
+    // Handle 'offer' from user
     socket.on('offer', (data) => {
         const partnerSocket = io.sockets.sockets.get(data.to);
         if (partnerSocket) {
@@ -37,6 +42,7 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle 'answer' from user
     socket.on('answer', (data) => {
         const partnerSocket = io.sockets.sockets.get(data.to);
         if (partnerSocket) {
@@ -47,6 +53,7 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle ICE candidates
     socket.on('ice-candidate', (data) => {
         const partnerSocket = io.sockets.sockets.get(data.to);
         if (partnerSocket) {
@@ -57,19 +64,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('disconnect', () => {
-        console.log('user disconnected');
-        if (waitingUser === socket) {
-            waitingUser = null; // If the waiting user disconnects, remove them from the queue
-        } else {
-            // If a connected user disconnects, notify their partner
-            const partnerSocket = io.sockets.sockets.get(socket.partnerId);
-            if (partnerSocket) {
-                partnerSocket.emit('partnerDisconnected');
-            }
-        }
-    });
-
+    // Handle chat messages
     socket.on('chat-message', (data) => {
         const partnerSocket = io.sockets.sockets.get(data.to);
         if (partnerSocket) {
@@ -80,6 +75,7 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Handle 'next' event for moving to the next user
     socket.on('next', () => {
         disconnectFromPartner(socket); // Disconnect from the current partner
 
@@ -88,6 +84,10 @@ io.on('connection', (socket) => {
             const partnerSocket = waitingUser;
             waitingUser = null;
 
+            // Set partner IDs for both users
+            socket.partnerId = partnerSocket.id;
+            partnerSocket.partnerId = socket.id;
+
             socket.emit('connected', { partnerId: partnerSocket.id });
             partnerSocket.emit('connected', { partnerId: socket.id });
         } else {
@@ -95,8 +95,24 @@ io.on('connection', (socket) => {
             waitingUser = socket;
         }
     });
+
+    // Handle disconnection
+    socket.on('disconnect', () => {
+        console.log('user disconnected');
+        if (waitingUser === socket) {
+            // If the waiting user disconnects, remove them from the queue
+            waitingUser = null;
+        } else {
+            // Notify partner if the connected user disconnects
+            const partnerSocket = io.sockets.sockets.get(socket.partnerId);
+            if (partnerSocket) {
+                partnerSocket.emit('partnerDisconnected');
+            }
+        }
+    });
 });
 
+// Helper function to disconnect the current partner
 function disconnectFromPartner(socket) {
     if (socket.partnerId) {
         const partnerSocket = io.sockets.sockets.get(socket.partnerId);
