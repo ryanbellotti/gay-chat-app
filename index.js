@@ -69,37 +69,32 @@ io.on('connection', (socket) => {
             }
         }
     });
-});
 
-http.listen(3000, () => {
-    console.log('listening on *:3000');
-});
-// ... (rest of the code from the previous step)
+    socket.on('chat-message', (data) => {
+        const partnerSocket = io.sockets.sockets.get(data.to);
+        if (partnerSocket) {
+            partnerSocket.emit('chat-message', {
+                message: data.message,
+                from: socket.id
+            });
+        }
+    });
 
-socket.on('chat-message', (data) => {
-    const partnerSocket = io.sockets.sockets.get(data.to);
-    if (partnerSocket) {
-        partnerSocket.emit('chat-message', {
-            message: data.message,
-            from: socket.id
-        });
-    }
-});
+    socket.on('next', () => {
+        disconnectFromPartner(socket); // Disconnect from the current partner
 
-// ... socket.on('next', () => {
-    disconnectFromPartner(socket); // Disconnect from the current partner
+        if (waitingUser) {
+            // If there's a waiting user, pair them with this user
+            const partnerSocket = waitingUser;
+            waitingUser = null;
 
-    if (waitingUser) {
-        // If there's a waiting user, pair them with this user
-        const partnerSocket = waitingUser;
-        waitingUser = null;
-
-        socket.emit('connected', { partnerId: partnerSocket.id });
-        partnerSocket.emit('connected', { partnerId: socket.id });
-    } else {
-        // If there's no waiting user, make this user wait
-        waitingUser = socket;
-    }
+            socket.emit('connected', { partnerId: partnerSocket.id });
+            partnerSocket.emit('connected', { partnerId: socket.id });
+        } else {
+            // If there's no waiting user, make this user wait
+            waitingUser = socket;
+        }
+    });
 });
 
 function disconnectFromPartner(socket) {
@@ -112,4 +107,6 @@ function disconnectFromPartner(socket) {
     socket.partnerId = null;
 }
 
-// ... (rest of the code)
+http.listen(3000, () => {
+    console.log('listening on *:3000');
+});
